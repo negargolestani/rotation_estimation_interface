@@ -41,14 +41,7 @@ class GUI(object):
         self.size = size
         self.background = tk.Canvas(self.root, borderwidth=0, height=self.size, width=self.size)
         self.container = self.background.create_rectangle(0, 0, self.size, self.size, width=0)
-        
-
-        # sub_frames = list()
-        # for r in range(2):
-        #     for c in range(3):
-        #         frame = tk.Frame(self.root)
-        #         frame.grid(row=r, column=c)
-        #         sub_frames.append(frame)
+    
 
         sub_frame = tk.Frame(self.root)
         sub_frame.place(relx=0.01, rely=0.01)
@@ -62,14 +55,14 @@ class GUI(object):
         sub_frame = tk.Frame(self.root)
         sub_frame.place(relx=.5, rely=0, anchor=tk.N)
 
-        self.time_disp = tk.Label(sub_frame, width=20,  text="")
+        # self.time_disp = tk.Label(sub_frame, width=20,  text="")
+        self.time_disp = tk.Button(sub_frame, text='Stop', width=20, command=self.stop)
         self.time_disp.grid(row=0, column=0)
         # tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=1) 
 
 
-
         sub_frame = tk.Frame(self.root)
-        sub_frame.place(relx=.5, rely=0.05, anchor=tk.S)
+        sub_frame.place(relx=.5, rely=0.06, anchor=tk.S)
        
         tk.Button(sub_frame, text='CCW Rotate', width=10, command=lambda: self.rotate(int(self.entry.get()))).grid(row=0, column=0)    
         self.entry = tk.Entry(sub_frame, bd=5, width=5, validate='all', validatecommand=((self.root.register(check_digit_entry)),'%P')) 
@@ -79,9 +72,7 @@ class GUI(object):
         tk.Button(sub_frame, text='flip', width=10, command=self.flip).grid(row=0, column=3)  
         tk.Button(sub_frame, text='Save', width=10, command=self.save).grid(row=0, column=4) 
         tk.Button(sub_frame, text='Reset', width=10, command=lambda: self.set_image(self.idx)).grid(row=0, column=5) 
-        tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=6) 
-
-
+        # tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=6) 
 
 
         # Bindings
@@ -94,16 +85,10 @@ class GUI(object):
     def set_clock(self):
         if self.start_time is not None: self.time = int((datetime.now()- self.start_time).total_seconds())
         else: self.time = 0
-        self.time_disp.configure(text=f"Timer: {self.time}")
+        self.time_disp.configure(text=f"{self.time} (Press to Stop)")
         self.root.after(100, self.set_clock)   
     #--------------------------------------------------------------------------------------
     def set_image(self, idx):
-        # if not hasattr(self, 'idx'): self.idx = 0
-        # while True:            
-        #     if self.data_df.loc[self.idx].isnull().values.any(): break
-        #     else: self.idx +=1
-        # if self.idx == len(self.data_df): self.root.destroy()
-
         # Load data
         image_dir = self.data_df.loc[idx, 'image']
         for key, val in replace_dict.items(): image_dir = image_dir.replace(key, val) 
@@ -122,9 +107,9 @@ class GUI(object):
         try: self.time = int(self.data_df.loc[idx, 'time'])
         except: self.time = 0
 
-        title = str(idx) 
-        if not self.data_df.loc[idx].isnull().any(): title += ' (saved)'
-        self.root.title(title)
+        if self.data_df.loc[idx].isnull().any():self.root.title(idx)
+        else: self.root.title(f"{idx} (saved)")
+
 
         # make imge square (for rotation)   
         self.cval = np.median(np.concatenate([ self.image[0,:], self.image[-1,:], self.image[:,0], self.image[:,-1] ], axis=0), axis=0)   
@@ -227,7 +212,7 @@ class GUI(object):
     #--------------------------------------------------------------------------------------
     def save(self):
         rotAng_deg = int(self.rotAng_deg)
-        self.data_df.loc[self.idx, 'rotation'] = np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
+        self.data_df.loc[self.idx, 'rotation'] = -np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
         self.data_df.loc[self.idx, 'flipping'] = int(self.flipping)
         self.data_df.loc[self.idx, 'time'] = self.time
         self.data_df.to_csv( self.csv_path, index=False )
