@@ -13,93 +13,176 @@ from datetime import datetime
 
 
 
-
 ####################################################################################################################################
 class GUI(object):     
-    def __init__(self, csv_path, size=1200, replace_dict=dict()):             
+    def __init__(self, csv_path, replace_dict=dict()):             
+        
+        self.set_input(csv_path, replace_dict)
+        self.set_overlay() 
+        self.set_clock()
 
-        self.csv_path = csv_path
-        self.size = size
-        self.replace_dict = replace_dict
-        self.data_df = pd.read_csv(csv_path)
-
-        self.overlay() 
-        self.next()
-        self.set()
+        self.start()
         self.root.mainloop()
 
-        return  
+        return                         
     #--------------------------------------------------------------------------------------
-    def overlay(self):
-        self.root = tk.Tk() 
-        self.root.title('Main') 
+    def set_input(self, csv_path, replace_dict):
+        self.csv_path = csv_path
+        self.replace_dict = replace_dict        
+        self.data_df = pd.read_csv(csv_path)
 
+        self.idx = 0
+        self.start_time = None 
+        return
+    #--------------------------------------------------------------------------------------
+    def set_overlay(self, size=1000):
+        self.root = tk.Tk() 
+
+        self.size = size
         self.background = tk.Canvas(self.root, borderwidth=0, height=self.size, width=self.size)
         self.container = self.background.create_rectangle(0, 0, self.size, self.size, width=0)
+        
 
-        self.buttons = tk.Frame(self.root)
-        self.buttons.pack(side=tk.TOP)
+        # sub_frames = list()
+        # for r in range(2):
+        #     for c in range(3):
+        #         frame = tk.Frame(self.root)
+        #         frame.grid(row=r, column=c)
+        #         sub_frames.append(frame)
 
-        tk.Label(self.buttons, text="Rotation Angle:").pack(side=tk.LEFT) 
-        self.entry = tk.Entry(self.buttons, bd=5, width=10)
-        self.entry.insert(tk.END, '10')
-        self.entry.pack(side=tk.LEFT) 
-        tk.Button(self.buttons, text='Rotate', width=10, command=lambda: self.rotate()).pack(side=tk.LEFT)  
-        tk.Button(self.buttons, text='flip', width=10, command=lambda: self.flip()).pack(side=tk.LEFT)  
-        tk.Button(self.buttons, text='Save', width=10, command=lambda: self.save()).pack(side=tk.RIGHT)  
+        sub_frame = tk.Frame(self.root)
+        sub_frame.place(relx=0.01, rely=0.01)
+        tk.Button(sub_frame, text='BACK', width=15, height=3, command=self.back).grid()
+
+        sub_frame = tk.Frame(self.root)
+        sub_frame.place(relx=.88, rely=0.01)
+        tk.Button(sub_frame, text='NEXT', width=15, height=3, command=self.next).grid()
 
 
+        sub_frame = tk.Frame(self.root)
+        sub_frame.place(relx=.5, rely=0, anchor=tk.N)
+
+        self.time_disp = tk.Label(sub_frame, width=20,  text="")
+        self.time_disp.grid(row=0, column=0)
+        # tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=1) 
+
+
+
+        sub_frame = tk.Frame(self.root)
+        sub_frame.place(relx=.5, rely=0.05, anchor=tk.S)
+       
+        tk.Button(sub_frame, text='CCW Rotate', width=10, command=lambda: self.rotate(int(self.entry.get()))).grid(row=0, column=0)    
+        self.entry = tk.Entry(sub_frame, bd=5, width=5, validate='all', validatecommand=((self.root.register(check_digit_entry)),'%P')) 
+        self.entry.insert(tk.END, '5')
+        self.entry.grid(row=0, column=1) 
+        tk.Button(sub_frame, text='CW Rotate', width=10, command=lambda: self.rotate(-int(self.entry.get()))).grid(row=0, column=2)  
+        tk.Button(sub_frame, text='flip', width=10, command=self.flip).grid(row=0, column=3)  
+        tk.Button(sub_frame, text='Save', width=10, command=self.save).grid(row=0, column=4) 
+        tk.Button(sub_frame, text='Reset', width=10, command=lambda: self.set_image(self.idx)).grid(row=0, column=5) 
+        tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=6) 
+
+
+
+
+        # Bindings
         self.background.bind('<ButtonPress-1>', lambda event: self.background.scan_mark(event.x, event.y))
         self.background.bind('<B1-Motion>', lambda event: self.background.scan_dragto(event.x, event.y, gain=1))
         self.background.bind('<MouseWheel>', lambda event: self.zoom(event)) 
 
-        return                                
+        return   
     #--------------------------------------------------------------------------------------
-    def next(self):
-        if not hasattr(self, 'idx'): self.idx = 0
-        while True:            
-            if self.data_df.loc[self.idx].isnull().values.any(): break
-            else: self.idx +=1
-        if self.idx == len(self.data_df): self.root.destroy()
-        return
+    def set_clock(self):
+        if self.start_time is not None: self.time = int((datetime.now()- self.start_time).total_seconds())
+        else: self.time = 0
+        self.time_disp.configure(text=f"Timer: {self.time}")
+        self.root.after(100, self.set_clock)   
     #--------------------------------------------------------------------------------------
-    def set(self):
-        # Update image directory
-        image_dir = self.data_df.loc[self.idx, 'image']
-        for key, val in self.replace_dict.items(): image_dir = image_dir.replace(key, val) 
+    def set_image(self, idx):
+        # if not hasattr(self, 'idx'): self.idx = 0
+        # while True:            
+        #     if self.data_df.loc[self.idx].isnull().values.any(): break
+        #     else: self.idx +=1
+        # if self.idx == len(self.data_df): self.root.destroy()
 
-        # load image
-        self.image = cv2.imread(image_dir)
-        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)  
+        # Load data
+        image_dir = self.data_df.loc[idx, 'image']
+        for key, val in replace_dict.items(): image_dir = image_dir.replace(key, val) 
+        self.image = cv2.cvtColor(cv2.imread(image_dir), cv2.COLOR_BGR2RGB)  
+        
+        try: 
+            self.rotAng_deg = int(self.data_df.loc[idx, 'rotation'])
+            self.rotate(self.rotAng_deg)
+        except: self.rotAng_deg = 0
+
+        try: 
+            self.flipping = bool(self.data_df.loc[idx, 'flipping'])
+            self.flip()
+        except: self.flipping = False
+
+        try: self.time = int(self.data_df.loc[idx, 'time'])
+        except: self.time = 0
+
+        title = str(idx) 
+        if not self.data_df.loc[idx].isnull().any(): title += ' (saved)'
+        self.root.title(title)
 
         # make imge square (for rotation)   
         self.cval = np.median(np.concatenate([ self.image[0,:], self.image[-1,:], self.image[:,0], self.image[:,-1] ], axis=0), axis=0)   
         H, W = self.image.shape[:2]
-        top, bottom, left, right = 0, 0, 0 ,0        
-        if W - H > 1:  top, bottom = [ int((W-H)/2) ]*2
-        elif H - W > 1:  left, right = [ int((H-W)/2) ]*2
+        top, bottom, left, right = [ int(.2*np.max([H, W]))] * 4   
+        if W - H > 1:  
+            top += int((W-H)/2) 
+            bottom += int((W-H)/2)
+        elif H - W > 1:  
+            left += int((H-W)/2)
+            right += int((H-W)/2) 
         self.image = cv2.copyMakeBorder(self.image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.cval)  
         self.scale = self.size / self.image.shape[0]
         
         self.refresh()
-        self.rotAng_deg = 0
-        self.flipping = False
-        self.time_start = datetime.now()               
         return
     #--------------------------------------------------------------------------------------
-    def refresh(self):  
-        self.root.title(self.idx)
+    def next(self):
+        self.idx += 1
+        self.set_image(self.idx)
+        self.start_time = datetime.now()         
+    #--------------------------------------------------------------------------------------
+    def back(self):
+        self.idx -= 1
+        self.set_image(self.idx)
+        self.start_time = datetime.now()         
+    #--------------------------------------------------------------------------------------
+    def start(self):   
+        self.root.deiconify()   
+        for win in self.root.winfo_children():
+            if isinstance(win, tk.Toplevel): win.destroy()
 
+        self.set_image(self.idx)
+        self.start_time = datetime.now()               
+    #--------------------------------------------------------------------------------------
+    def stop(self):
+        self.start_time = None
+        self.root.withdraw()
+
+        popup = tk.Toplevel(self.root)
+        popup.title('Press to Start')
+        popup.protocol("WM_DELETE_WINDOW", self.root.destroy)
+
+        tk.Button(popup, text='Start', width=20, height=5, command=self.start).place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        x,y,w,h = self.root.winfo_rootx(), self.root.winfo_rooty(), self.root.winfo_width(), self.root.winfo_height()        
+        popup.geometry(f'{500}x{500}+{x+int(w/3)}+{y+int(h/5)}')
+        
+        popup.grab_set()                    
+    #--------------------------------------------------------------------------------------
+    def refresh(self):  
         image = cv2.resize(self.image, None, fx=self.scale, fy=self.scale).astype(np.uint8)        
         self.background.image = ImageTk.PhotoImage(Image.fromarray(image))
         self.background.create_image(0, 0, image=self.background.image, anchor=tk.NW)
-        self.background.pack(side=tk.BOTTOM)
+        self.background.grid()
         return  
     #--------------------------------------------------------------------------------------
-    def rotate(self):
-        rotAng_deg = self.entry.get()
-        if rotAng_deg.lstrip('-+').isdigit(): 
-            rotAng_deg = -int(rotAng_deg)
+    def rotate(self, rotAng_deg):
+        if isinstance(rotAng_deg, int):
             height, width = self.image.shape[:2]    
             image_center = (width/2, height/2)     
             rotation_mat = cv2.getRotationMatrix2D(image_center, rotAng_deg, 1.)
@@ -144,15 +227,17 @@ class GUI(object):
     #--------------------------------------------------------------------------------------
     def save(self):
         rotAng_deg = int(self.rotAng_deg)
-        self.data_df.loc[self.idx, 'estimated angle'] = np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
-        self.data_df.loc[self.idx, 'estimated flipping'] = int(self.flipping)
-        self.data_df.loc[self.idx, 'time'] = (datetime.now()- self.time_start).total_seconds()
+        self.data_df.loc[self.idx, 'rotation'] = np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
+        self.data_df.loc[self.idx, 'flipping'] = int(self.flipping)
+        self.data_df.loc[self.idx, 'time'] = self.time
         self.data_df.to_csv( self.csv_path, index=False )
 
-        self.idx += 1
-        self.set()
+        self.next()
 ####################################################################################################################################
-
+def check_digit_entry(P):
+    if str.isdigit(P) or P == "": return True
+    else: return False
+####################################################################################################################################
 
 
 
@@ -167,5 +252,5 @@ if __name__ == '__main__':
     csv_path = './data/data_testing.csv'
     replace_dict = {'data_processed':'Y:'}
 
-    interface = GUI( csv_path, replace_dict=replace_dict )
+    interface = GUI(csv_path, replace_dict=replace_dict )
 
