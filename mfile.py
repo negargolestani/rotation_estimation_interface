@@ -10,7 +10,7 @@ import cv2
 import tkinter as tk
 from PIL import Image, ImageTk
 from datetime import datetime
-
+import os
 
 
 ####################################################################################################################################
@@ -45,11 +45,11 @@ class GUI(object):
 
         sub_frame = tk.Frame(self.root)
         sub_frame.place(relx=0.01, rely=0.01)
-        tk.Button(sub_frame, text='BACK', width=15, height=3, command=self.back).grid()
+        tk.Button(sub_frame, text='BACK', width=15, height=3, command=lambda: self.set_frame(self.idx-1)).grid()
 
         sub_frame = tk.Frame(self.root)
         sub_frame.place(relx=.88, rely=0.01)
-        tk.Button(sub_frame, text='NEXT', width=15, height=3, command=self.next).grid()
+        tk.Button(sub_frame, text='NEXT', width=15, height=3, command=lambda: self.set_frame(self.idx+1)).grid()
 
 
         sub_frame = tk.Frame(self.root)
@@ -62,7 +62,7 @@ class GUI(object):
 
 
         sub_frame = tk.Frame(self.root)
-        sub_frame.place(relx=.5, rely=0.06, anchor=tk.S)
+        sub_frame.place(relx=.5, rely=0.055, anchor=tk.S)
        
         tk.Button(sub_frame, text='CCW Rotate', width=10, command=lambda: self.rotate(int(self.entry.get()))).grid(row=0, column=0)    
         self.entry = tk.Entry(sub_frame, bd=5, width=5, validate='all', validatecommand=((self.root.register(check_digit_entry)),'%P')) 
@@ -71,9 +71,14 @@ class GUI(object):
         tk.Button(sub_frame, text='CW Rotate', width=10, command=lambda: self.rotate(-int(self.entry.get()))).grid(row=0, column=2)  
         tk.Button(sub_frame, text='flip', width=10, command=self.flip).grid(row=0, column=3)  
         tk.Button(sub_frame, text='Save', width=10, command=self.save).grid(row=0, column=4) 
-        tk.Button(sub_frame, text='Reset', width=10, command=lambda: self.set_image(self.idx)).grid(row=0, column=5) 
+        tk.Button(sub_frame, text='Reset', width=10, command=lambda: self.set_frame(self.idx, reload=False)).grid(row=0, column=5) 
         # tk.Button(sub_frame, text='Stop', width=10, command=self.stop).grid(row=0, column=6) 
 
+
+        sub_frame = tk.Frame(self.root)
+        sub_frame.place(relx=.5, rely=0.08, anchor=tk.S)
+        self.tnf_frame = tk.Label(sub_frame, width=50,  text="")
+        self.tnf_frame.grid()
 
         # Bindings
         self.background.bind('<ButtonPress-1>', lambda event: self.background.scan_mark(event.x, event.y))
@@ -88,28 +93,15 @@ class GUI(object):
         self.time_disp.configure(text=f"{self.time} (Press to Stop)")
         self.root.after(100, self.set_clock)   
     #--------------------------------------------------------------------------------------
-    def set_image(self, idx):
+    def set_frame(self, idx, reload=True):
+        self.idx = idx
+        self.rotAng_deg = 0
+        self.flipping = False
+        
         # Load data
         image_dir = self.data_df.loc[idx, 'image']
         for key, val in replace_dict.items(): image_dir = image_dir.replace(key, val) 
         self.image = cv2.cvtColor(cv2.imread(image_dir), cv2.COLOR_BGR2RGB)  
-        
-        try: 
-            self.rotAng_deg = int(self.data_df.loc[idx, 'rotation'])
-            self.rotate(self.rotAng_deg)
-        except: self.rotAng_deg = 0
-
-        try: 
-            self.flipping = bool(self.data_df.loc[idx, 'flipping'])
-            self.flip()
-        except: self.flipping = False
-
-        try: self.time = int(self.data_df.loc[idx, 'time'])
-        except: self.time = 0
-
-        if self.data_df.loc[idx].isnull().any():self.root.title(idx)
-        else: self.root.title(f"{idx} (saved)")
-
 
         # make imge square (for rotation)   
         self.cval = np.median(np.concatenate([ self.image[0,:], self.image[-1,:], self.image[:,0], self.image[:,-1] ], axis=0), axis=0)   
@@ -123,27 +115,34 @@ class GUI(object):
             right += int((H-W)/2) 
         self.image = cv2.copyMakeBorder(self.image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.cval)  
         self.scale = self.size / self.image.shape[0]
+
+        if reload:
+            rotAng_deg = self.data_df.loc[idx, 'rotation']
+            rotAng_deg = 0 if np.isnan(rotAng_deg) else int(rotAng_deg)
+            self.rotate(rotAng_deg)
+
+            flipping = self.data_df.loc[idx, 'flipping']
+            flipping = False if np.isnan(flipping) else bool(flipping)
+            if flipping: self.flip()        
+
+            try: self.time = int(self.data_df.loc[idx, 'time'])
+            except: self.time = 0
+
+        
+        title = f"{self.idx} - {os.path.basename(image_dir).split('.')[0]}"
+        if not self.data_df.loc[idx].isnull().any(): title += ' (saved)'
+        self.root.title(title)        
         
         self.refresh()
+        self.start_time = datetime.now()
         return
-    #--------------------------------------------------------------------------------------
-    def next(self):
-        self.idx += 1
-        self.set_image(self.idx)
-        self.start_time = datetime.now()         
-    #--------------------------------------------------------------------------------------
-    def back(self):
-        self.idx -= 1
-        self.set_image(self.idx)
-        self.start_time = datetime.now()         
     #--------------------------------------------------------------------------------------
     def start(self):   
         self.root.deiconify()   
         for win in self.root.winfo_children():
             if isinstance(win, tk.Toplevel): win.destroy()
 
-        self.set_image(self.idx)
-        self.start_time = datetime.now()               
+        self.set_frame(self.idx)
     #--------------------------------------------------------------------------------------
     def stop(self):
         self.start_time = None
@@ -164,6 +163,12 @@ class GUI(object):
         self.background.image = ImageTk.PhotoImage(Image.fromarray(image))
         self.background.create_image(0, 0, image=self.background.image, anchor=tk.NW)
         self.background.grid()
+
+        if self.rotAng_deg == 0: rot_dir = ''
+        elif self.rotAng_deg < 0: rot_dir = '(CW)'
+        elif self.rotAng_deg > 0: rot_dir = '(CCW)'
+        
+        self.tnf_frame.config(text=f'Rotation = {abs(self.rotAng_deg)} {rot_dir} \t \t Flipping = {self.flipping}')
         return  
     #--------------------------------------------------------------------------------------
     def rotate(self, rotAng_deg):
@@ -179,9 +184,9 @@ class GUI(object):
     #--------------------------------------------------------------------------------------
     def flip(self):
         self.image = cv2.flip(self.image, 1)
+        self.flipping = not self.flipping  
 
         self.refresh()
-        self.flipping =  not self.flipping  
         return
     #--------------------------------------------------------------------------------------
     def zoom(self, event, delta=1.1, min_pxl=30):
@@ -212,12 +217,12 @@ class GUI(object):
     #--------------------------------------------------------------------------------------
     def save(self):
         rotAng_deg = int(self.rotAng_deg)
-        self.data_df.loc[self.idx, 'rotation'] = -np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
+        self.data_df.loc[self.idx, 'rotation'] = np.sign(rotAng_deg)*(np.abs(rotAng_deg)%360)
         self.data_df.loc[self.idx, 'flipping'] = int(self.flipping)
         self.data_df.loc[self.idx, 'time'] = self.time
         self.data_df.to_csv( self.csv_path, index=False )
 
-        self.next()
+        self.set_frame(self.idx+1)
 ####################################################################################################################################
 def check_digit_entry(P):
     if str.isdigit(P) or P == "": return True
