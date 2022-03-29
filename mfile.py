@@ -48,7 +48,7 @@ class GUI(object):
         tk.Button(sub_frame, text='BACK', width=15, height=3, command=lambda: self.set_frame(self.idx-1)).grid()
 
         sub_frame = tk.Frame(self.root)
-        sub_frame.place(relx=.88, rely=0.01)
+        sub_frame.place(relx=.87, rely=0.01)
         tk.Button(sub_frame, text='NEXT', width=15, height=3, command=lambda: self.set_frame(self.idx+1)).grid()
 
 
@@ -168,7 +168,7 @@ class GUI(object):
         elif self.rotAng_deg < 0: rot_dir = '(CW)'
         elif self.rotAng_deg > 0: rot_dir = '(CCW)'
         
-        self.tnf_frame.config(text=f'Rotation = {abs(self.rotAng_deg)} {rot_dir} \t \t Flipping = {self.flipping}')
+        self.tnf_frame.config(text=f'Total Rotation = {abs(self.rotAng_deg)} {rot_dir} \t \t Total Flipping = {self.flipping}')
         return  
     #--------------------------------------------------------------------------------------
     def rotate(self, rotAng_deg):
