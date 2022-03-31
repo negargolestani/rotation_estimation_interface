@@ -235,8 +235,6 @@ def check_digit_entry(P):
 
 
 # black ink on left  -  blue ink on right 
-
-
 if __name__ == '__main__':
 
     csv_path = './data/data_testing.csv'
@@ -244,5 +242,11 @@ if __name__ == '__main__':
     interface = GUI(csv_path, replace_dict=replace_dict )
 
 
+
+    # csv_path = './data/data_testing.csv'
+    # df = pd.read_csv(csv_path)
+    # for i, row in df.iterrows():
+    #     if not row.flipping: df.loc[i, 'rotation'] = - int(row.rotation)
+    # df.to_csv('./data/data_testing_newVersion.csv', index=False)
 
 
